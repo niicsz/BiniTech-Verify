@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: BiniTech Verify API
+  version: 1.0.0
+  description: >-
+    Códigos de verificação de 6 dígitos enviados por e-mail ou SMS. Uso interno entre os serviços
+    BiniTech: toda chamada em /api exige o cabeçalho X-Verify-Service-Key. O código nunca é
+    devolvido pela API e é guardado só como HMAC.
+servers:
+  - url: /
+tags:
+  - name: Verifications
+security:
+  - ServiceKey: []
+paths:
+  /api/verifications:
+    post:
+      tags: [Verifications]
+      operationId: startVerification
+      summary: Gerar um código e enviar por e-mail ou SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartVerificationRequest' }
+      responses:
+        '201':
+          description: Código enviado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationDTO' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ChannelUnavailable' }
+  /api/verifications/{id}:
+    get:
+      tags: [Verifications]
+      operationId: getVerification
+      summary: Consultar a situação de uma verificação
+      parameters:
+        - $ref: '#/components/parameters/VerificationId'
+      responses:
+        '200':
+          description: Situação atual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationDTO' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/verifications/{id}/resend:
+    post:
+      tags: [Verifications]
+      operationId: resendVerification
+      summary: Enviar um código novo para o mesmo destino
+      description: O código anterior deixa de valer. Respeita o intervalo mínimo e o limite de reenvios.
+      parameters:
+        - $ref: '#/components/parameters/VerificationId'
+      responses:
+        '200':
+          description: Código novo enviado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationDTO' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AlreadyUsed' }
+        '410': { $ref: '#/components/responses/Expired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ChannelUnavailable' }
+  /api/verifications/{id}/check:
+    post:
+      tags: [Verifications]
+      operationId: checkVerification
+      summary: Conferir o código informado pelo usuário
+      description: Um código certo encerra a verificação; ele não vale uma segunda vez.
+      parameters:
+        - $ref: '#/components/parameters/VerificationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckVerificationRequest' }
+      responses:
+        '200':
+          description: Código certo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationResultDTO' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AlreadyUsed' }
+        '410': { $ref: '#/components/responses/Expired' }
+        '422':
+          description: Código errado; remainingAttempts diz quantas tentativas restam
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorDTO' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+components:
+  securitySchemes:
+    ServiceKey:
+      type: apiKey
+      in: header
+      name: X-Verify-Service-Key
+  parameters:
+    VerificationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, maxLength: 64 }
+  schemas:
+    Channel:
+      type: string
+      enum: [EMAIL, SMS]
+    Purpose:
+      type: string
+      enum: [SIGNUP, NEW_DEVICE, ACCOUNT_RECOVERY]
+    VerificationStatus:
+      type: string
+      enum: [PENDING, VERIFIED, EXPIRED, BLOCKED]
+    StartVerificationRequest:
+      type: object
+      required: [channel, destination, purpose]
+      properties:
+        channel: { $ref: '#/components/schemas/Channel' }
+        destination:
+          type: string
+          minLength: 1
+          maxLength: 254
+          description: E-mail ou celular brasileiro com DDD, em qualquer formatação
+        purpose: { $ref: '#/components/schemas/Purpose' }
+    CheckVerificationRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+    VerificationDTO:
+      type: object
+      properties:
+        id: { type: string }
+        channel: { $ref: '#/components/schemas/Channel' }
+        purpose: { $ref: '#/components/schemas/Purpose' }
+        status: { $ref: '#/components/schemas/VerificationStatus' }
+        maskedDestination: { type: string }
+        expiresAt: { type: string, format: date-time }
+        resendAvailableAt: { type: string, format: date-time }
+        remainingAttempts: { type: integer }
+        remainingResends: { type: integer }
+    VerificationResultDTO:
+      type: object
+      properties:
+        verificationId: { type: string }
+        channel: { $ref: '#/components/schemas/Channel' }
+        destination:
+          type: string
+          description: Destino normalizado (e-mail em minúsculas ou celular no formato 55DDDNÚMERO)
+        purpose: { $ref: '#/components/schemas/Purpose' }
+        verifiedAt: { type: string, format: date-time }
+    ErrorDTO:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        remainingAttempts: { type: integer }
+        retryAfterSeconds: { type: integer }
+        timestamp: { type: string, format: date-time }
+  responses:
+    BadRequest:
+      description: Dados inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
+    Unauthorized:
+      description: Chave de serviço ausente ou errada
+    NotFound:
+      description: Verificação não encontrada
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
+    AlreadyUsed:
+      description: O código desta verificação já foi usado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
+    Expired:
+      description: O código venceu; é preciso começar uma verificação nova
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
+    TooManyRequests:
+      description: Limite de envios ou de tentativas atingido; retryAfterSeconds e o cabeçalho Retry-After dizem quando tentar de novo
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
+    ChannelUnavailable:
+      description: O envio por este canal não está disponível agora
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorDTO' }
