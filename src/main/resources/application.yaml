@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: BiniTech Verify
+  threads:
+    virtual:
+      enabled: true
+  mongodb:
+    uri: ${VERIFY_MONGODB_URI}
+    database: ${VERIFY_MONGODB_DATABASE:binitech_verify}
+  data:
+    mongodb:
+      auto-index-creation: true
+
+server:
+  port: ${PORT:8085}
+
+verify:
+  service-key: ${VERIFY_SERVICE_KEY}
+  code-pepper: ${VERIFY_CODE_PEPPER}
+  code-ttl: ${VERIFY_CODE_TTL:10m}
+  max-attempts: ${VERIFY_MAX_ATTEMPTS:5}
+  max-sends: ${VERIFY_MAX_SENDS:3}
+  resend-cooldown: ${VERIFY_RESEND_COOLDOWN:60s}
+  max-per-destination-per-hour: ${VERIFY_MAX_PER_DESTINATION_PER_HOUR:5}
+  log-codes: ${VERIFY_LOG_CODES:false}
+
+mobizon:
+  base-url: ${MOBIZON_BASE_URL:https://api.mobizon.com.br}
+  api-key: ${MOBIZON_API_KEY:}
+  sender-id: ${MOBIZON_SENDER_ID:}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from: ${RESEND_FROM:BiniTech <onboarding@resend.dev>}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
