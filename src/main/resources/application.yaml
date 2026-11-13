@@ -34,6 +34,7 @@ resend:
   from: ${RESEND_FROM:BiniTech <onboarding@resend.dev>}
 
 whatsapp:
+  enabled: ${VERIFY_WHATSAPP_ENABLED:false}
   business-number: ${WHATSAPP_BUSINESS_NUMBER:}
   app-secret: ${WHATSAPP_APP_SECRET:}
   verify-token: ${WHATSAPP_VERIFY_TOKEN:}

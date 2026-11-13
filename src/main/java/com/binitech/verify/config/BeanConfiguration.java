@@ -53,6 +53,7 @@ public class BeanConfiguration {
       @Value("${mobizon.sender-id:}") String mobizonSender,
       @Value("${resend.api-key:}") String resendKey,
       @Value("${resend.from}") String resendFrom,
+      @Value("${whatsapp.enabled:false}") boolean whatsappEnabled,
       @Value("${whatsapp.business-number:}") String whatsappNumber,
       @Value("${whatsapp.app-secret:}") String whatsappSecret,
       @Value("${whatsapp.verify-token:}") String whatsappVerifyToken,
@@ -77,7 +78,10 @@ public class BeanConfiguration {
       senders.add(new LoggingCodeSenderAdapter(Channel.EMAIL));
     }
     WhatsAppPort whatsApp = null;
-    if (!whatsappNumber.isBlank() && !whatsappSecret.isBlank() && !whatsappVerifyToken.isBlank()) {
+    if (whatsappEnabled
+        && !whatsappNumber.isBlank()
+        && !whatsappSecret.isBlank()
+        && !whatsappVerifyToken.isBlank()) {
       boolean canReply = !whatsappPhoneId.isBlank() && !whatsappToken.isBlank();
       whatsApp =
           new WhatsAppCloudAdapter(

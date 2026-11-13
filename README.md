@@ -88,6 +88,7 @@ Sem chave de um provedor, o canal fica desligado e a API responde `503` para ele
 | `MOBIZON_BASE_URL` | não | `https://api.mobizon.com.br` | |
 | `RESEND_API_KEY` | para e-mail | | Chave do Resend |
 | `RESEND_FROM` | não | `BiniTech <onboarding@resend.dev>` | Remetente verificado no Resend |
+| `VERIFY_WHATSAPP_ENABLED` | não | `false` | Feature flag do canal WhatsApp. Desligada, o canal responde 503 e o webhook 404, mesmo com as variáveis abaixo |
 | `WHATSAPP_BUSINESS_NUMBER` | para WhatsApp | | Número da BiniTech no WhatsApp com DDI e DDD, usado no link wa.me |
 | `WHATSAPP_APP_SECRET` | para WhatsApp | | Segredo do app na Meta; confere a assinatura do webhook |
 | `WHATSAPP_VERIFY_TOKEN` | para WhatsApp | | Texto livre informado ao cadastrar o webhook na Meta |
