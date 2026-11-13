@@ -13,7 +13,18 @@ public interface VerificationUseCasePort {
       Verification verification,
       Instant resendAvailableAt,
       int remainingAttempts,
-      int remainingResends) {}
+      int remainingResends,
+      String whatsappCode,
+      String whatsappLink) {
+
+    public VerificationView(
+        Verification verification,
+        Instant resendAvailableAt,
+        int remainingAttempts,
+        int remainingResends) {
+      this(verification, resendAvailableAt, remainingAttempts, remainingResends, null, null);
+    }
+  }
 
   record CheckResult(
       String verificationId,
@@ -29,4 +40,6 @@ public interface VerificationUseCasePort {
   VerificationView resend(String id);
 
   CheckResult check(String id, String code);
+
+  void confirmByWhatsApp(String sender, String message);
 }

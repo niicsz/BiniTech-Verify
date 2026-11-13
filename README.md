@@ -1,6 +1,6 @@
 # BiniTech Verify
 
-Serviço de códigos de verificação de 6 dígitos para os serviços BiniTech. O cliente escolhe receber o código por **e-mail** ou por **SMS**; o serviço gera o código, envia pelo canal escolhido e confere o que o cliente digitou.
+Serviço de códigos de verificação de 6 dígitos para os serviços BiniTech. O cliente escolhe confirmar por **e-mail**, **SMS** ou **WhatsApp**. No e-mail e no SMS o serviço gera o código, envia e confere o que o cliente digitou. No WhatsApp o caminho é o inverso e não custa nada: o cliente manda o código para o WhatsApp da BiniTech.
 
 É usado no cadastro do cliente do delivery e no login em aparelho novo (BTPDV-220). Quem chama é sempre outro serviço BiniTech, nunca o navegador.
 
@@ -31,8 +31,20 @@ Toda chamada em `/api` exige o cabeçalho `X-Verify-Service-Key`.
 | GET | `/api/verifications/{id}` | Situação, destino mascarado, tentativas e reenvios restantes |
 | POST | `/api/verifications/{id}/resend` | Envia um código novo; o anterior deixa de valer |
 | POST | `/api/verifications/{id}/check` | Confere o código; devolve o destino verificado |
+| GET/POST | `/webhooks/whatsapp` | Webhook da API Cloud do WhatsApp (público, protegido pela assinatura da Meta) |
 
 Respostas de erro: `400` dados inválidos, `401` sem chave, `404` não encontrada, `409` código já usado, `410` código vencido, `422` código errado (com `remainingAttempts`), `429` limite atingido (com `Retry-After`), `503` canal indisponível.
+
+### Confirmação pelo WhatsApp
+
+1. O Auth cria a verificação com `channel: WHATSAPP` e o celular do cliente. A resposta traz `whatsappCode` e `whatsappLink` (`https://wa.me/<número da BiniTech>?text=Confirmar meu número na BiniTech. Código 123456`). Nada é enviado.
+2. A tela mostra o botão com esse link. O cliente toca e envia a mensagem pronta.
+3. A Meta entrega a mensagem em `POST /webhooks/whatsapp`. O serviço confere a assinatura `X-Hub-Signature-256`, acha a verificação pelo código e confere se quem mandou é o celular informado (com ou sem o nono dígito, que o WhatsApp às vezes omite). Se for, a verificação vira `VERIFIED` e o cliente recebe "Pronto! Seu número foi confirmado".
+4. O Auth consulta `GET /api/verifications/{id}` até `status: VERIFIED` (campo `verifiedAt`).
+
+A prova é o número de quem manda a mensagem, por isso o código pode aparecer na tela. Mensagem de outro número gasta uma tentativa e recebe aviso com o número mascarado. Não há reenvio nem `/check` nesse canal.
+
+Custo: receber mensagem e responder dentro da janela de 24 horas aberta pelo cliente é grátis na API Cloud da Meta. Precisa de um app na Meta, uma conta WhatsApp Business e um número só para isso.
 
 ### Regras
 
@@ -51,6 +63,7 @@ Respostas de erro: `400` dados inválidos, `401` sem chave, `404` não encontrad
 |---|---|---|---|
 | E-mail | Resend | Grátis até 3.000 e-mails por mês | Já usado pelo PDV |
 | SMS | Mobizon Brasil | Cerca de R$ 0,06 por SMS, pré-pago, sem mensalidade | Paga por Pix, boleto ou cartão |
+| WhatsApp | API Cloud da Meta | Grátis (o cliente manda; a resposta vai na janela de atendimento) | Precisa de app na Meta e número dedicado |
 
 Para trocar de provedor de SMS basta outro adaptador de `CodeSenderPort`; o resto do serviço não muda. Alternativas avaliadas em 12/11/2026: SMSGo (cerca de US$ 0,048 por SMS, 3 grátis para teste), Unimatrix (US$ 0,0397), AWS SNS (cerca de US$ 0,03) e Twilio (cerca de US$ 0,06). O WhatsApp de autenticação da Meta sai mais barato por mensagem (cerca de US$ 0,007), mas exige modelo aprovado e conta comercial verificada.
 
@@ -75,6 +88,12 @@ Sem chave de um provedor, o canal fica desligado e a API responde `503` para ele
 | `MOBIZON_BASE_URL` | não | `https://api.mobizon.com.br` | |
 | `RESEND_API_KEY` | para e-mail | | Chave do Resend |
 | `RESEND_FROM` | não | `BiniTech <onboarding@resend.dev>` | Remetente verificado no Resend |
+| `WHATSAPP_BUSINESS_NUMBER` | para WhatsApp | | Número da BiniTech no WhatsApp com DDI e DDD, usado no link wa.me |
+| `WHATSAPP_APP_SECRET` | para WhatsApp | | Segredo do app na Meta; confere a assinatura do webhook |
+| `WHATSAPP_VERIFY_TOKEN` | para WhatsApp | | Texto livre informado ao cadastrar o webhook na Meta |
+| `WHATSAPP_PHONE_NUMBER_ID` | para responder | | ID do número na API Cloud |
+| `WHATSAPP_ACCESS_TOKEN` | para responder | | Token permanente de usuário do sistema; sem ele o canal confirma, mas não responde |
+| `WHATSAPP_GRAPH_URL` | não | `https://graph.facebook.com/v23.0` | |
 | `PORT` | não | `8085` | |
 
 Gerar as chaves: `openssl rand -base64 48`.

@@ -33,6 +33,14 @@ resend:
   api-key: ${RESEND_API_KEY:}
   from: ${RESEND_FROM:BiniTech <onboarding@resend.dev>}
 
+whatsapp:
+  business-number: ${WHATSAPP_BUSINESS_NUMBER:}
+  app-secret: ${WHATSAPP_APP_SECRET:}
+  verify-token: ${WHATSAPP_VERIFY_TOKEN:}
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  graph-url: ${WHATSAPP_GRAPH_URL:https://graph.facebook.com/v23.0}
+
 springdoc:
   api-docs:
     path: /api-docs

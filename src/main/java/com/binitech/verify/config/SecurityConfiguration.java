@@ -22,6 +22,8 @@ public class SecurityConfiguration {
                 a.requestMatchers(
                         "/actuator/health/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                     .permitAll()
+                    .requestMatchers("/webhooks/whatsapp")
+                    .permitAll()
                     .requestMatchers("/api/verifications/**", "/api/verifications")
                     .hasRole("SERVICE")
                     .anyRequest()

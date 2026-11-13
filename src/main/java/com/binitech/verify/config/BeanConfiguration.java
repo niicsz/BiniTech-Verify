@@ -5,9 +5,11 @@ import com.binitech.verify.adapters.outbound.email.ResendEmailSenderAdapter;
 import com.binitech.verify.adapters.outbound.security.HmacCodeHasherAdapter;
 import com.binitech.verify.adapters.outbound.security.SecureRandomCodeGeneratorAdapter;
 import com.binitech.verify.adapters.outbound.sms.MobizonSmsSenderAdapter;
+import com.binitech.verify.adapters.outbound.whatsapp.WhatsAppCloudAdapter;
 import com.binitech.verify.application.ports.inbound.VerificationUseCasePort;
 import com.binitech.verify.application.ports.outbound.CodeSenderPort;
 import com.binitech.verify.application.ports.outbound.VerificationRepositoryPort;
+import com.binitech.verify.application.ports.outbound.WhatsAppPort;
 import com.binitech.verify.application.usecases.VerificationUseCase;
 import com.binitech.verify.domain.Channel;
 import java.time.Clock;
@@ -50,7 +52,13 @@ public class BeanConfiguration {
       @Value("${mobizon.api-key:}") String mobizonKey,
       @Value("${mobizon.sender-id:}") String mobizonSender,
       @Value("${resend.api-key:}") String resendKey,
-      @Value("${resend.from}") String resendFrom) {
+      @Value("${resend.from}") String resendFrom,
+      @Value("${whatsapp.business-number:}") String whatsappNumber,
+      @Value("${whatsapp.app-secret:}") String whatsappSecret,
+      @Value("${whatsapp.verify-token:}") String whatsappVerifyToken,
+      @Value("${whatsapp.graph-url}") String whatsappGraphUrl,
+      @Value("${whatsapp.phone-number-id:}") String whatsappPhoneId,
+      @Value("${whatsapp.access-token:}") String whatsappToken) {
     List<CodeSenderPort> senders = new ArrayList<>();
     if (!mobizonKey.isBlank()) {
       senders.add(
@@ -68,9 +76,29 @@ public class BeanConfiguration {
     } else if (logCodes) {
       senders.add(new LoggingCodeSenderAdapter(Channel.EMAIL));
     }
+    WhatsAppPort whatsApp = null;
+    if (!whatsappNumber.isBlank() && !whatsappSecret.isBlank() && !whatsappVerifyToken.isBlank()) {
+      boolean canReply = !whatsappPhoneId.isBlank() && !whatsappToken.isBlank();
+      whatsApp =
+          new WhatsAppCloudAdapter(
+              canReply
+                  ? client(whatsappGraphUrl)
+                      .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + whatsappToken)
+                      .build()
+                  : null,
+              whatsappNumber,
+              whatsappPhoneId);
+      if (!canReply) {
+        LOGGER.warn("WhatsApp sem WHATSAPP_ACCESS_TOKEN: confirma números, mas não responde");
+      }
+    }
+    List<String> active = new ArrayList<>(senders.stream().map(s -> s.channel().name()).toList());
+    if (whatsApp != null) {
+      active.add(Channel.WHATSAPP.name());
+    }
     LOGGER.info(
         "Canais de envio ativos: {}{}",
-        senders.stream().map(s -> s.channel().name()).toList(),
+        active,
         logCodes ? " (códigos no log: só para desenvolvimento)" : "");
     return new VerificationUseCase(
         repository,
@@ -79,7 +107,8 @@ public class BeanConfiguration {
         new HmacCodeHasherAdapter(pepper),
         new VerificationUseCase.Policy(
             ttl, maxAttempts, maxSends, resendCooldown, maxPerDestination),
-        clock);
+        clock,
+        whatsApp);
   }
 
   private static RestClient.Builder client(String url) {

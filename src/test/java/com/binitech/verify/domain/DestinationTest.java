@@ -54,4 +54,29 @@ class DestinationTest {
         .isInstanceOf(BusinessException.class)
         .hasMessageContaining("e-mail ou por SMS");
   }
+
+  @Test
+  @DisplayName("WhatsApp usa o mesmo formato do celular")
+  void normalizesWhatsApp() {
+    Destination destination = Destination.of(Channel.WHATSAPP, "(11) 98765-4321");
+
+    assertThat(destination.channel()).isEqualTo(Channel.WHATSAPP);
+    assertThat(destination.value()).isEqualTo("5511987654321");
+    assertThat(destination.masked()).isEqualTo("(11) *****-4321");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"5511987654321", "551187654321", "+55 11 98765-4321"})
+  @DisplayName("Remetente do WhatsApp confere com ou sem o nono dígito")
+  void matchesWhatsAppSender(String sender) {
+    assertThat(Destination.of(Channel.WHATSAPP, "11987654321").isSameMobile(sender)).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"5511987654320", "5521987654321", ""})
+  @DisplayName("Outro número no WhatsApp não confere")
+  void rejectsOtherWhatsAppSender(String sender) {
+    assertThat(Destination.of(Channel.WHATSAPP, "11987654321").isSameMobile(sender)).isFalse();
+    assertThat(Destination.of(Channel.EMAIL, "a@b.com").isSameMobile(sender)).isFalse();
+  }
 }

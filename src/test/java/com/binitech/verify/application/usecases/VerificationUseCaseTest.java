@@ -9,11 +9,13 @@ import com.binitech.verify.application.ports.inbound.VerificationUseCasePort.Ver
 import com.binitech.verify.application.ports.outbound.CodeHasherPort;
 import com.binitech.verify.application.ports.outbound.CodeSenderPort;
 import com.binitech.verify.application.ports.outbound.VerificationRepositoryPort;
+import com.binitech.verify.application.ports.outbound.WhatsAppPort;
 import com.binitech.verify.domain.Channel;
 import com.binitech.verify.domain.Destination;
 import com.binitech.verify.domain.Purpose;
 import com.binitech.verify.domain.Verification;
 import com.binitech.verify.domain.VerificationStatus;
+import com.binitech.verify.domain.exception.BusinessException;
 import com.binitech.verify.domain.exception.ChannelUnavailableException;
 import com.binitech.verify.domain.exception.CodeAlreadyUsedException;
 import com.binitech.verify.domain.exception.InvalidCodeException;
@@ -235,6 +237,123 @@ class VerificationUseCaseTest {
     assertThat(useCase.get(id).remainingAttempts()).isEqualTo(5);
   }
 
+  private final FakeWhatsApp whatsApp = new FakeWhatsApp();
+
+  private VerificationView startWhatsApp() {
+    VerificationUseCase withWhatsApp =
+        new VerificationUseCase(
+            repository,
+            List.of(sms, email),
+            codes::poll,
+            new PlainHasher(),
+            POLICY,
+            clock,
+            whatsApp);
+    useCase = withWhatsApp;
+    return useCase.start(new StartCommand(Channel.WHATSAPP, "(11) 98765-4321", Purpose.SIGNUP));
+  }
+
+  @Test
+  @DisplayName("WhatsApp devolve código e link, não envia nada e guarda só o hash")
+  void whatsAppStartReturnsLink() {
+    VerificationView view = startWhatsApp();
+
+    assertThat(view.whatsappCode()).isEqualTo("123456");
+    assertThat(view.whatsappLink())
+        .isEqualTo("link:Confirmar meu número na BiniTech. Código 123456");
+    assertThat(view.remainingResends()).isZero();
+    assertThat(view.resendAvailableAt()).isNull();
+    assertThat(sms.sent).isEmpty();
+    assertThat(repository.store.get(view.verification().getId()).getCodeHash())
+        .isEqualTo("hash:whatsapp:123456");
+  }
+
+  @Test
+  @DisplayName("Sem WhatsApp configurado o canal responde indisponível")
+  void whatsAppUnavailable() {
+    assertThatThrownBy(
+            () -> useCase.start(new StartCommand(Channel.WHATSAPP, "11987654321", Purpose.SIGNUP)))
+        .isInstanceOf(ChannelUnavailableException.class)
+        .hasMessageContaining("WhatsApp");
+  }
+
+  @Test
+  @DisplayName("Mensagem do mesmo número confirma, mesmo sem o nono dígito")
+  void whatsAppConfirms() {
+    String id = startWhatsApp().verification().getId();
+
+    useCase.confirmByWhatsApp("551187654321", "Confirmar meu número na BiniTech. Código 123456");
+
+    assertThat(useCase.get(id).verification().getStatus()).isEqualTo(VerificationStatus.VERIFIED);
+    assertThat(whatsApp.replies).singleElement().asString().contains("Pronto!");
+  }
+
+  @Test
+  @DisplayName("Mensagem de outro número não confirma e gasta uma tentativa")
+  void whatsAppOtherNumber() {
+    String id = startWhatsApp().verification().getId();
+
+    useCase.confirmByWhatsApp("5521999998888", "Código 123456");
+
+    VerificationView view = useCase.get(id);
+    assertThat(view.verification().getStatus()).isEqualTo(VerificationStatus.PENDING);
+    assertThat(view.remainingAttempts()).isEqualTo(4);
+    assertThat(whatsApp.replies).singleElement().asString().contains("(11) *****-4321");
+  }
+
+  @Test
+  @DisplayName("Código vencido no WhatsApp marca como vencido e avisa")
+  void whatsAppExpired() {
+    String id = startWhatsApp().verification().getId();
+    clock.advance(Duration.ofMinutes(11));
+
+    useCase.confirmByWhatsApp("5511987654321", "Código 123456");
+
+    assertThat(repository.store.get(id).getStatus()).isEqualTo(VerificationStatus.EXPIRED);
+    assertThat(whatsApp.replies).singleElement().asString().contains("venceu");
+  }
+
+  @Test
+  @DisplayName("Código usado ou mensagem sem código recebem orientação")
+  void whatsAppUsedOrNoCode() {
+    startWhatsApp();
+    useCase.confirmByWhatsApp("5511987654321", "Código 123456");
+
+    useCase.confirmByWhatsApp("5511987654321", "Código 123456");
+    useCase.confirmByWhatsApp("5511987654321", "oi, tudo bem?");
+
+    assertThat(whatsApp.replies).hasSize(3);
+    assertThat(whatsApp.replies.get(1)).contains("Não encontrei");
+    assertThat(whatsApp.replies.get(2)).contains("só confirma cadastros");
+  }
+
+  @Test
+  @DisplayName("Verificação pelo WhatsApp não aceita conferência por código nem reenvio")
+  void whatsAppHasNoCheckOrResend() {
+    String id = startWhatsApp().verification().getId();
+
+    assertThatThrownBy(() -> useCase.check(id, "123456"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("WhatsApp");
+    assertThatThrownBy(() -> useCase.resend(id))
+        .isInstanceOf(BusinessException.class)
+        .hasMessageContaining("WhatsApp");
+  }
+
+  static final class FakeWhatsApp implements WhatsAppPort {
+    final List<String> replies = new ArrayList<>();
+
+    @Override
+    public String chatLink(String message) {
+      return "link:" + message;
+    }
+
+    @Override
+    public void reply(String to, String message) {
+      replies.add(message);
+    }
+  }
+
   static final class InMemoryRepository implements VerificationRepositoryPort {
     final Map<String, Verification> store = new HashMap<>();
 
@@ -247,6 +366,15 @@ class VerificationUseCaseTest {
     @Override
     public Optional<Verification> findById(String id) {
       return Optional.ofNullable(store.get(id)).map(v -> Verification.restore(v.snapshot()));
+    }
+
+    @Override
+    public List<Verification> findPendingByCodeHash(String codeHash) {
+      return store.values().stream()
+          .filter(v -> v.getCodeHash().equals(codeHash))
+          .filter(v -> v.getStatus() == VerificationStatus.PENDING)
+          .map(v -> Verification.restore(v.snapshot()))
+          .toList();
     }
 
     @Override
