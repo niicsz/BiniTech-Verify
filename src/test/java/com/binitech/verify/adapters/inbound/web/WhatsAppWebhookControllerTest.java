@@ -33,7 +33,12 @@ class WhatsAppWebhookControllerTest {
   private final VerificationUseCasePort useCase = mock(VerificationUseCasePort.class);
 
   private MockMvc mvc(String secret, String token) {
-    return MockMvcBuilders.standaloneSetup(new WhatsAppWebhookController(useCase, secret, token))
+    return mvc(true, secret, token);
+  }
+
+  private MockMvc mvc(boolean enabled, String secret, String token) {
+    return MockMvcBuilders.standaloneSetup(
+            new WhatsAppWebhookController(useCase, enabled, secret, token))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
   }
@@ -96,6 +101,20 @@ class WhatsAppWebhookControllerTest {
                 .header("X-Hub-Signature-256", sign(PAYLOAD + " "))
                 .content(PAYLOAD))
         .andExpect(status().isUnauthorized());
+
+    verifyNoInteractions(useCase);
+  }
+
+  @Test
+  @DisplayName("Com a flag desligada o webhook não existe, mesmo configurado")
+  void disabledByFlag() throws Exception {
+    mvc(false, SECRET, VERIFY_TOKEN)
+        .perform(
+            post("/webhooks/whatsapp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Hub-Signature-256", sign(PAYLOAD))
+                .content(PAYLOAD))
+        .andExpect(status().isNotFound());
 
     verifyNoInteractions(useCase);
   }

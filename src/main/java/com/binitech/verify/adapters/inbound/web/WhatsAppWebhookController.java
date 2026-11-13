@@ -33,10 +33,11 @@ public class WhatsAppWebhookController implements WebhooksApi {
 
   public WhatsAppWebhookController(
       VerificationUseCasePort verifications,
+      @Value("${whatsapp.enabled:false}") boolean enabledFlag,
       @Value("${whatsapp.app-secret:}") String appSecret,
       @Value("${whatsapp.verify-token:}") String verifyToken) {
     this.verifications = verifications;
-    boolean enabled = !appSecret.isBlank() && !verifyToken.isBlank();
+    boolean enabled = enabledFlag && !appSecret.isBlank() && !verifyToken.isBlank();
     this.appSecret =
         enabled ? new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), ALGORITHM) : null;
     this.verifyToken = enabled ? verifyToken.getBytes(StandardCharsets.UTF_8) : null;
