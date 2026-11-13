@@ -13,7 +13,7 @@ public class VerificationDocument {
   private String channel;
   private String destination;
   private String purpose;
-  private String codeHash;
+  @Indexed private String codeHash;
   private String status;
   private int attempts;
   private int sends;

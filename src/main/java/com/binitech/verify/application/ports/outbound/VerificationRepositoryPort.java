@@ -2,6 +2,7 @@ package com.binitech.verify.application.ports.outbound;
 
 import com.binitech.verify.domain.Verification;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface VerificationRepositoryPort {
@@ -9,6 +10,8 @@ public interface VerificationRepositoryPort {
   Verification save(Verification verification);
 
   Optional<Verification> findById(String id);
+
+  List<Verification> findPendingByCodeHash(String codeHash);
 
   long countCreatedSince(String destination, Instant since);
 }

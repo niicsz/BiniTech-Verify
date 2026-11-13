@@ -7,6 +7,7 @@ import com.binitech.verify.domain.Purpose;
 import com.binitech.verify.domain.Verification;
 import com.binitech.verify.domain.VerificationStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -31,6 +32,21 @@ public class MongoVerificationRepositoryAdapter implements VerificationRepositor
   public Optional<Verification> findById(String id) {
     return Optional.ofNullable(mongo.findById(id, VerificationDocument.class))
         .map(MongoVerificationRepositoryAdapter::toDomain);
+  }
+
+  @Override
+  public List<Verification> findPendingByCodeHash(String codeHash) {
+    return mongo
+        .find(
+            Query.query(
+                Criteria.where("codeHash")
+                    .is(codeHash)
+                    .and("status")
+                    .is(VerificationStatus.PENDING.name())),
+            VerificationDocument.class)
+        .stream()
+        .map(MongoVerificationRepositoryAdapter::toDomain)
+        .toList();
   }
 
   @Override

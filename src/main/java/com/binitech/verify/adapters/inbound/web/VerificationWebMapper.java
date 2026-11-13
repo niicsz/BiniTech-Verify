@@ -30,7 +30,10 @@ final class VerificationWebMapper {
         .expiresAt(time(verification.getExpiresAt()))
         .resendAvailableAt(time(view.resendAvailableAt()))
         .remainingAttempts(view.remainingAttempts())
-        .remainingResends(view.remainingResends());
+        .remainingResends(view.remainingResends())
+        .verifiedAt(time(verification.getVerifiedAt()))
+        .whatsappCode(view.whatsappCode())
+        .whatsappLink(view.whatsappLink());
   }
 
   static VerificationResultDTO toDto(CheckResult result) {

@@ -16,7 +16,8 @@ public record Destination(Channel channel, String value) {
     String trimmed = raw == null ? "" : raw.strip();
     return switch (channel) {
       case EMAIL -> email(trimmed);
-      case SMS -> mobile(trimmed);
+      case SMS -> mobile(Channel.SMS, trimmed);
+      case WHATSAPP -> mobile(Channel.WHATSAPP, trimmed);
     };
   }
 
@@ -28,7 +29,7 @@ public record Destination(Channel channel, String value) {
     return new Destination(Channel.EMAIL, value);
   }
 
-  private static Destination mobile(String raw) {
+  private static Destination mobile(Channel channel, String raw) {
     String digits = raw.replaceAll("\\D", "");
     if (digits.startsWith("55") && digits.length() == 13) {
       digits = digits.substring(2);
@@ -39,7 +40,16 @@ public record Destination(Channel channel, String value) {
         || digits.charAt(1) == '0') {
       throw new BusinessException("Informe um celular com DDD, por exemplo (11) 91234-5678.");
     }
-    return new Destination(Channel.SMS, "55" + digits);
+    return new Destination(channel, "55" + digits);
+  }
+
+  public boolean isSameMobile(String whatsappId) {
+    if (channel == Channel.EMAIL || whatsappId == null) {
+      return false;
+    }
+    String sender = whatsappId.replaceAll("\\D", "");
+    String withoutNinthDigit = value.substring(0, 4) + value.substring(5);
+    return sender.equals(value) || sender.equals(withoutNinthDigit);
   }
 
   public String masked() {

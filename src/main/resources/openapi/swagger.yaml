@@ -10,6 +10,7 @@ servers:
   - url: /
 tags:
   - name: Verifications
+  - name: Webhooks
 security:
   - ServiceKey: []
 paths:
@@ -98,6 +99,45 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorDTO' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /webhooks/whatsapp:
+    get:
+      tags: [Webhooks]
+      operationId: verifyWhatsAppWebhook
+      summary: Confirmação do webhook pela Meta
+      description: A Meta chama esta rota ao cadastrar o webhook e espera receber hub.challenge de volta.
+      security: []
+      parameters:
+        - { name: hub.mode, in: query, required: false, schema: { type: string } }
+        - { name: hub.verify_token, in: query, required: false, schema: { type: string } }
+        - { name: hub.challenge, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Desafio devolvido
+          content:
+            text/plain:
+              schema: { type: string }
+        '403': { description: Token de verificação errado }
+        '404': { description: Canal WhatsApp desligado }
+    post:
+      tags: [Webhooks]
+      operationId: receiveWhatsAppWebhook
+      summary: Mensagens recebidas no WhatsApp da BiniTech
+      description: >-
+        Evento da API Cloud do WhatsApp. O corpo é lido como texto para conferir a assinatura
+        X-Hub-Signature-256 (HMAC-SHA256 com o segredo do app) antes de qualquer processamento.
+        Cada mensagem com um código pendente confirma a verificação do número que a enviou.
+      security: []
+      parameters:
+        - { name: X-Hub-Signature-256, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: string }
+      responses:
+        '200': { description: Evento recebido }
+        '401': { description: Assinatura ausente ou errada }
+        '404': { description: Canal WhatsApp desligado }
 components:
   securitySchemes:
     ServiceKey:
@@ -113,7 +153,7 @@ components:
   schemas:
     Channel:
       type: string
-      enum: [EMAIL, SMS]
+      enum: [EMAIL, SMS, WHATSAPP]
     Purpose:
       type: string
       enum: [SIGNUP, NEW_DEVICE, ACCOUNT_RECOVERY]
@@ -129,7 +169,7 @@ components:
           type: string
           minLength: 1
           maxLength: 254
-          description: E-mail ou celular brasileiro com DDD, em qualquer formatação
+          description: E-mail ou celular brasileiro com DDD, em qualquer formatação. No WhatsApp é o número que vai mandar a mensagem
         purpose: { $ref: '#/components/schemas/Purpose' }
     CheckVerificationRequest:
       type: object
@@ -150,6 +190,13 @@ components:
         resendAvailableAt: { type: string, format: date-time }
         remainingAttempts: { type: integer }
         remainingResends: { type: integer }
+        verifiedAt: { type: string, format: date-time }
+        whatsappCode:
+          type: string
+          description: Só no canal WHATSAPP e só na criação. Código que o cliente manda pelo WhatsApp; a prova é o número de quem manda
+        whatsappLink:
+          type: string
+          description: Só no canal WHATSAPP e só na criação. Link wa.me com a mensagem pronta
     VerificationResultDTO:
       type: object
       properties:
