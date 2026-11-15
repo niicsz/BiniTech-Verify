@@ -116,7 +116,8 @@ public class BeanConfiguration {
   }
 
   private static RestClient.Builder client(String url) {
-    if (!url.matches("https?://.+")) {
+    if (!url.matches("https://.+")
+        && !url.matches("http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/.*)?")) {
       throw new IllegalArgumentException("URL de provedor inválida: " + url);
     }
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

@@ -39,6 +39,7 @@ public class MobizonSmsSenderAdapter implements CodeSenderPort {
   @Override
   public void send(Destination destination, String code, Purpose purpose, Duration validity) {
     MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("apiKey", apiKey);
     form.add("recipient", destination.value());
     form.add("text", SmsText.of(code, validity));
     if (senderId != null && !senderId.isBlank()) {
@@ -54,7 +55,6 @@ public class MobizonSmsSenderAdapter implements CodeSenderPort {
                       uri.path("/service/message/sendSmsMessage")
                           .queryParam("output", "json")
                           .queryParam("api", "v1")
-                          .queryParam("apiKey", apiKey)
                           .build())
               .contentType(MediaType.APPLICATION_FORM_URLENCODED)
               .body(form)

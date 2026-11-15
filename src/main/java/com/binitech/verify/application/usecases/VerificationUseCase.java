@@ -230,8 +230,6 @@ public class VerificationUseCase implements VerificationUseCasePort {
       repository.save(only);
       return WHATSAPP_EXPIRED;
     }
-    only.registerAttempt(false, now, policy.maxAttempts());
-    repository.save(only);
     return "Esta mensagem precisa sair do WhatsApp do número "
         + only.getDestination().masked()
         + ", o mesmo informado no cadastro.";
