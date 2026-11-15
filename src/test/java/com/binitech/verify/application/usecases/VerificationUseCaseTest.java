@@ -289,7 +289,7 @@ class VerificationUseCaseTest {
   }
 
   @Test
-  @DisplayName("Mensagem de outro número não confirma e gasta uma tentativa")
+  @DisplayName("Mensagem de outro número não confirma nem gasta tentativa do dono")
   void whatsAppOtherNumber() {
     String id = startWhatsApp().verification().getId();
 
@@ -297,7 +297,7 @@ class VerificationUseCaseTest {
 
     VerificationView view = useCase.get(id);
     assertThat(view.verification().getStatus()).isEqualTo(VerificationStatus.PENDING);
-    assertThat(view.remainingAttempts()).isEqualTo(4);
+    assertThat(view.remainingAttempts()).isEqualTo(5);
     assertThat(whatsApp.replies).singleElement().asString().contains("(11) *****-4321");
   }
 

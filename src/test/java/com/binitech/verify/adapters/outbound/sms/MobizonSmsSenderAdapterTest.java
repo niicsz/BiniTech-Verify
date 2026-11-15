@@ -1,5 +1,6 @@
 package com.binitech.verify.adapters.outbound.sms;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -42,6 +43,7 @@ class MobizonSmsSenderAdapterTest {
   @DisplayName("Envia recipient, texto sem acento e remetente para a Mobizon")
   void sendsSms() {
     MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("apiKey", "chave-teste");
     form.add("recipient", "5511987654321");
     form.add(
         "text", "BiniTech: seu codigo e 123456. Vale por 10 minutos. Nao compartilhe com ninguem.");
@@ -49,7 +51,7 @@ class MobizonSmsSenderAdapterTest {
     server
         .expect(requestTo(startsWith("https://api.mobizon.com.br/service/message/sendSmsMessage")))
         .andExpect(method(HttpMethod.POST))
-        .andExpect(queryParam("apiKey", "chave-teste"))
+        .andExpect(request -> assertThat(request.getURI().getQuery()).doesNotContain("apiKey"))
         .andExpect(queryParam("output", "json"))
         .andExpect(queryParam("api", "v1"))
         .andExpect(content().formData(form))
